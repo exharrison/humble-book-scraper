@@ -67,9 +67,6 @@ def expand_volume_ranges(books):
     vols_pattern = re.compile(r'(.*?)(?:\s+)?Vols?\.?|Volumes?(?:\s+)?(\d+)-(\d+)(.*)', re.IGNORECASE)
     for book in books:
         title = book['title']
-        img_url = book.get('image_url')
-        authors = book.get('authors')
-        format_detail = book.get('format')
         # Try 'Vols #-#' first
         match_vols = re.match(r'(.*?)(?:\s+)?(vols?\.?|volumes?)(?:\s+)?(\d+)-(\d+)(.*)', title, re.IGNORECASE)
         if match_vols:
@@ -78,10 +75,12 @@ def expand_volume_ranges(books):
             end = int(match_vols.group(4))
             suffix = match_vols.group(5).strip()
             for i in range(start, end + 1):
+                new_book = dict(book)  # Copy all fields
                 vol_title = f"{prefix} Vol. {i}"
                 if suffix:
                     vol_title += f" {suffix}"
-                expanded_books.append({'title': vol_title, 'image_url': img_url, 'authors': authors, 'format': format_detail})
+                new_book['title'] = vol_title
+                expanded_books.append(new_book)
             continue
         # Try 'Vol #-#' next
         match = vol_pattern.match(title)
@@ -91,10 +90,12 @@ def expand_volume_ranges(books):
             end = int(match.group(3))
             suffix = match.group(4).strip()
             for i in range(start, end + 1):
+                new_book = dict(book)  # Copy all fields
                 vol_title = f"{prefix} Vol. {i}"
                 if suffix:
                     vol_title += f" {suffix}"
-                expanded_books.append({'title': vol_title, 'image_url': img_url, 'authors': authors, 'format': format_detail})
+                new_book['title'] = vol_title
+                expanded_books.append(new_book)
         else:
             expanded_books.append(book)
     return expanded_books
@@ -277,11 +278,20 @@ def parse_books_from_html(html_path):
             # Image
             img_el = details_view.select_one('img.item-image')
             img_url = img_el['data-lazy'] if img_el and img_el.has_attr('data-lazy') else (img_el['src'] if img_el and img_el.has_attr('src') else None)
+            # Tier price
+            tier_price = None
+            header_area = details_view.select_one('.header-area')
+            if header_area:
+                # Try to get .tier-price first, then .msrp if not found
+                price_el = header_area.select_one('.tier-price') or header_area.select_one('.msrp')
+                if price_el:
+                    tier_price = price_el.get_text(strip=True)
             books.append({
                 'title': title,
                 'authors': authors,
                 'format': format_detail,
-                'image_url': img_url
+                'image_url': img_url,
+                'tier_price': tier_price
             })
     return books
 
